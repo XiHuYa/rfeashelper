@@ -41,14 +41,14 @@ mod config {
         }
         match mode {
             Mode::Auto => {
-                isGame = ask::ask_isGame();
+                isGame = ask::ask_isGame(app);
                 fps = ask::ask_target_fps();
             }
             Mode::AutoFps => {
                 fps = ask::ask_target_fps();
             }
             Mode::AutoGame => {
-                isGame = ask::ask_isGame();
+                isGame = ask::ask_isGame(app);
             }
             Mode::Manual => {}
         }
@@ -57,6 +57,8 @@ mod config {
 }
 
 mod ask {
+    use std::{thread::sleep, time::{Duration, self}};
+
     use crate::misc::{exec_cmd, cut};
 
     pub fn ask_topApp() -> String {
@@ -85,11 +87,50 @@ mod ask {
         }
         topapp
     }
-    pub fn ask_isGame() -> bool {
-
+    pub fn ask_isGame(app: &str) -> bool {
+        let mut current_surface_view = exec_cmd("dumpsys", &["SurfaceFlinger", "--list"])
+            .expect("Err : Failed to execute dumpsys SurfaceView");
+        for line in current_surface_view.lines() {
+            if line.contains("SurfaceView[") && line.contains("BLAST") {
+                let current_surface_view = line;
+                return current_surface_view.contains(app);
+            } else if line.contains("SurfaceView -") {
+                let current_surface_view = line;
+                return current_surface_view.contains(app);
+            }
+        }
+        return false;
     }
-    pub fn ask_target_fps() -> i32 {
+    fn get_current_fps() -> u64 {
+        let mut current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
+            .expect("Err : Failed to dump fps");
 
+        current_fps = cut(&current_fps, "(", 1);
+        current_fps = cut(&current_fps, "\'", 0);
+
+        let frame_A = u64::from_str_radix(&current_fps, 16)
+            .unwrap();
+
+        let timeA = time::SystemTime::now();
+
+        sleep(Duration::from_millis(100));
+
+        current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
+            .expect("Err : Failed to dump fps");
+
+        current_fps = cut(&current_fps, "(", 1);
+        current_fps = cut(&current_fps, "\'", 0);
+
+        let frame_B = u64::from_str_radix(&current_fps, 16)
+            .unwrap();
+
+        let timeB = time::SystemTime::now();
+        (frame_B - frame_A) / (timeB.duration_since(timeA)
+            .unwrap()
+            .as_secs();)
+    }
+    pub fn ask_target_fps() -> u64 {
+        let fps = get_current_fps();
     }
 }
 
