@@ -2,9 +2,7 @@ use std::{thread::sleep, time::Duration};
 mod misc;
 
 mod config {
-    use std::collections::{hash_map, HashMap};
-
-    use crate::ask;
+    use crate::{ask, misc::cut};
 
     pub enum Mode {
         Auto, // 完全自动推断，忽略白名单(likely)
@@ -19,6 +17,7 @@ mod config {
     fn read_config() {
         
     }
+
     pub fn ask(app: &str) -> App_config {
         use std::fs;
         
@@ -28,11 +27,8 @@ mod config {
         let config = fs::read_to_string("/data/FEAShelper.conf").expect("Err : Fail to read config");
         for line in config.lines() {
             if line.contains("Mode") {
-                let mode_conf: Vec<&str> = line.split("=")
-                    .collect();
-                let mode_conf = mode_conf[1]
-                    .trim();
-                mode = match mode_conf {
+                let mode_conf = cut(line, "=", 1);
+                mode = match &mode_conf[..] {
                     "Auto" => Mode::Auto,
                     "AutoFps" => Mode::AutoFps,
                     "AutoGame" => Mode::AutoGame,
@@ -42,10 +38,8 @@ mod config {
             }
             if (line.contains(app)) {
                 isGame = true;
-                let app_conf: Vec<&str> = line.split(" ")
-                    .collect();
-                fps = app_conf[1].trim()
-                    .parse()
+                let app_conf = cut(line, "=", 1);
+                fps = app_conf.parse()
                     .expect("Err : Failed to read fps");
             }
         }
@@ -67,7 +61,7 @@ mod config {
 }
 
 mod ask {
-    use crate::misc::exec_cmd;
+    use crate::misc::{exec_cmd, cut};
 
     pub fn ask_topApp() -> String {
         use std::path::Path;
@@ -88,7 +82,9 @@ mod ask {
             .expect("Err : Failed to dumpsys for Topapp");
         for line in dump_top.lines() {
             if line.contains("topResumedActivit=") {
-                topapp = line.split('{').collect();
+                topapp = cut(&line, "{", 1);
+                topapp = cut(&topapp, "/", 0);
+                topapp = cut(&topapp, " ", 2);
             }
         }
         topapp

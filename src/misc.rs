@@ -29,3 +29,12 @@ pub fn exec_cmd(command :&str, args :&[&str]) -> Result<String, i32> {
         }
     }
 }
+
+pub fn cut(str: &str, sym: &str, f: usize) -> String {
+    let fs: Vec<&str> = str.split(sym).collect();
+    match fs.get(f) {
+        Some(s) => s.trim()
+            .to_string(),
+        None => String::new()
+    }
+}
