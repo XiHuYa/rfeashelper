@@ -1,4 +1,6 @@
 use std::{thread::sleep, time::Duration};
+
+use config::App_config;
 mod misc;
 
 mod config {
@@ -10,13 +12,7 @@ mod config {
         AutoGame, // 推断是否游戏，准守白名单fps
         Manual // 无自动推断，完全准守白名单
     }
-    pub struct App_config {
-        isGame: bool,
-        fps: i32
-    }
-    fn read_config() {
-        
-    }
+    pub struct App_config (pub bool, pub i32);
 
     pub fn ask(app: &str) -> App_config {
         use std::fs;
@@ -56,7 +52,7 @@ mod config {
             }
             Mode::Manual => {}
         }
-        App_config { isGame , fps }
+        App_config ( isGame , fps )
     }
 }
 
@@ -100,5 +96,6 @@ mod ask {
 fn run () {
     loop {
         sleep(Duration::from_secs(1));
+        let App_config(on, fps) = config::ask(&ask::ask_topApp());
     }
 }
