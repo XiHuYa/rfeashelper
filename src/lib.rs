@@ -1,7 +1,10 @@
+use std::{thread::sleep, time::Duration};
+mod misc;
+
 mod config {
     use std::collections::{hash_map, HashMap};
 
-    use crate::tools;
+    use crate::ask;
 
     pub enum Mode {
         Auto, // 完全自动推断，忽略白名单(likely)
@@ -48,14 +51,14 @@ mod config {
         }
         match mode {
             Mode::Auto => {
-                isGame = tools::ask_isGame();
-                fps = tools::ask_target_fps();
+                isGame = ask::ask_isGame();
+                fps = ask::ask_target_fps();
             }
             Mode::AutoFps => {
-                fps = tools::ask_target_fps();
+                fps = ask::ask_target_fps();
             }
             Mode::AutoGame => {
-                isGame = tools::ask_isGame();
+                isGame = ask::ask_isGame();
             }
             Mode::Manual => {}
         }
@@ -63,9 +66,32 @@ mod config {
     }
 }
 
-mod tools {
-    pub fn ask_topApp() -> String {
+mod ask {
+    use crate::misc::exec_cmd;
 
+    pub fn ask_topApp() -> String {
+        use std::path::Path;
+        use std::fs;
+
+        let mut topapp = String::new();
+        if Path::new("/sys/kernel/gbe/gbe2_fg_pid").exists() {
+            let mut pid = fs::read_to_string("/sys/kernel/gbe/gbe2_fg_pid")
+                .expect("Err : Fail to read pid")
+                .trim();
+            topapp = fs::read_to_string(format!("/proc/{}/cmdline", pid))
+                .expect("Err : Fail to read cmdline")
+                .trim()
+                .to_string();
+            return topapp;
+        }
+        let dump_top = exec_cmd("dumpsys", &["activity", "activities"])
+            .expect("Err : Failed to dumpsys for Topapp");
+        for line in dump_top.lines() {
+            if line.contains("topResumedActivit=") {
+                topapp = line.split('{').collect();
+            }
+        }
+        topapp
     }
     pub fn ask_isGame() -> bool {
 
@@ -77,6 +103,6 @@ mod tools {
 
 fn run () {
     loop {
-        
+        sleep(Duration::from_secs(1));
     }
 }
