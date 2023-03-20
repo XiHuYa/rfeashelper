@@ -1,6 +1,6 @@
 use std::{thread::sleep, time::Duration};
 
-use config::App_config;
+use config::AppConfig;
 mod misc;
 
 mod config {
@@ -12,13 +12,13 @@ mod config {
         AutoGame, // 推断是否游戏，准守白名单fps
         Manual // 无自动推断，完全准守白名单
     }
-    pub struct App_config (pub bool, pub i32);
+    pub struct AppConfig (pub bool, pub u64);
 
-    pub fn ask(app: &str) -> App_config {
+    pub fn ask(app: &str) -> AppConfig {
         use std::fs;
         
         let mut isGame = false;
-        let mut fps: i32 = 0;
+        let mut fps: u64 = 0;
         let mut mode = Mode::Auto;
         let config = fs::read_to_string("/data/FEAShelper.conf").expect("Err : Fail to read config");
         for line in config.lines() {
@@ -29,10 +29,12 @@ mod config {
                     "AutoFps" => Mode::AutoFps,
                     "AutoGame" => Mode::AutoGame,
                     "Manual" => Mode::Manual,
-                    _ => {panic!("Err : Failed to read mode");}
+                    _ => {
+                        panic!("Err : Failed to read mode");
+                    }
                 }
             }
-            if (line.contains(app)) {
+            if line.contains(app) {
                 isGame = true;
                 let app_conf = cut(line, "=", 1);
                 fps = app_conf.parse()
@@ -52,7 +54,7 @@ mod config {
             }
             Mode::Manual => {}
         }
-        App_config ( isGame , fps )
+        AppConfig ( isGame , fps )
     }
 }
 
@@ -67,9 +69,10 @@ mod ask {
 
         let mut topapp = String::new();
         if Path::new("/sys/kernel/gbe/gbe2_fg_pid").exists() {
-            let mut pid = fs::read_to_string("/sys/kernel/gbe/gbe2_fg_pid")
+            let pid = fs::read_to_string("/sys/kernel/gbe/gbe2_fg_pid")
                 .expect("Err : Fail to read pid")
-                .trim();
+                .trim()
+                .to_string();
             topapp = fs::read_to_string(format!("/proc/{}/cmdline", pid))
                 .expect("Err : Fail to read cmdline")
                 .trim()
@@ -88,7 +91,7 @@ mod ask {
         topapp
     }
     pub fn ask_isGame(app: &str) -> bool {
-        let mut current_surface_view = exec_cmd("dumpsys", &["SurfaceFlinger", "--list"])
+        let current_surface_view = exec_cmd("dumpsys", &["SurfaceFlinger", "--list"])
             .expect("Err : Failed to execute dumpsys SurfaceView");
         for line in current_surface_view.lines() {
             if line.contains("SurfaceView[") && line.contains("BLAST") {
@@ -101,6 +104,7 @@ mod ask {
         }
         return false;
     }
+    
     fn get_current_fps() -> u64 {
         let mut current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
@@ -125,18 +129,26 @@ mod ask {
             .unwrap();
 
         let timeB = time::SystemTime::now();
-        (frame_B - frame_A) / (timeB.duration_since(timeA)
-            .unwrap()
-            .as_secs();)
+        (frame_B - frame_A) / (timeB.duration_since(timeA).unwrap().as_secs())
     }
+    
     pub fn ask_target_fps() -> u64 {
         let fps = get_current_fps();
+        const FPS: [u64;6] = [30, 45, 60, 90, 120, 144];
+        let mut i = 1;
+        while i < (FPS.len() - 1) {
+            if fps > FPS[i] && fps < FPS[i + 1] {
+                return FPS[i];
+            }
+            i += 1;
+        }
+        *FPS.last().unwrap()
     }
 }
 
-fn run () {
+pub fn run () {
     loop {
         sleep(Duration::from_secs(1));
-        let App_config(on, fps) = config::ask(&ask::ask_topApp());
+        let AppConfig(on, fps) = config::ask(&ask::ask_topApp());
     }
 }
