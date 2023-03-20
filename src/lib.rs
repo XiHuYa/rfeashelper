@@ -12,7 +12,7 @@ mod config {
         AutoGame, // 推断是否游戏，准守白名单fps
         Manual // 无自动推断，完全准守白名单
     }
-    pub struct AppConfig (pub bool, pub u64);
+    pub struct AppConfig(pub bool, pub u64);
 
     pub fn ask(app: &str) -> AppConfig {
         use std::fs;
@@ -108,26 +108,18 @@ mod ask {
     fn get_current_fps() -> u64 {
         let mut current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
-
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-
         let frame_A = u64::from_str_radix(&current_fps, 16)
             .unwrap();
-
         let timeA = time::SystemTime::now();
-
         sleep(Duration::from_millis(100));
-
         current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
-
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-
         let frame_B = u64::from_str_radix(&current_fps, 16)
             .unwrap();
-
         let timeB = time::SystemTime::now();
         (frame_B - frame_A) / (timeB.duration_since(timeA).unwrap().as_secs())
     }
@@ -150,5 +142,10 @@ pub fn run () {
     loop {
         sleep(Duration::from_secs(1));
         let AppConfig(on, fps) = config::ask(&ask::ask_topApp());
+        if on {
+            // to do : 打开feas
+        } else {
+            // to do : 关闭feas
+        }
     }
 }
