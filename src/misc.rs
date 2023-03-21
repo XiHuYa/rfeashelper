@@ -38,3 +38,28 @@ pub fn cut(str: &str, sym: &str, f: usize) -> String {
         None => String::new()
     }
 }
+
+pub fn WriteFile(content: &str, path: &str) {
+    use std::fs::{OpenOptions, set_permissions};
+    use std::io::Write;
+    use std::os::unix::fs::{PermissionsExt};
+    // println!("path: {}, value: {}", &content, &path);
+    match set_permissions(path, PermissionsExt::from_mode(0o644)) {
+        Ok(()) => {
+            match OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(path) {
+                    Ok(mut file) => {
+                        match file.write_all(content.as_bytes()) {
+                            Ok(()) => {}
+                            Err(e) => println!("Write failed: {}", e),
+                        }
+                    },
+                    Err(e) => println!("Open failed: {}", e),
+                }
+        },
+        Err(e) => println!("Set permissions failed: {}", e),
+    }
+}
