@@ -38,7 +38,8 @@ mod config {
                     }
                 }
             }
-            if line.contains(app) {
+            // println!("{}, {}", &line, app.len());
+            if line.contains(&app) {
                 if line.contains("[B]") {
                     return AppConfig ( false, 0);
                 }
@@ -46,6 +47,7 @@ mod config {
                 let app_conf = cut(line, "=", 1);
                 fps = app_conf.parse()
                     .expect("Err : Failed to read fps");
+                return AppConfig ( isGame, fps );
             }
         }
         match mode {
@@ -71,11 +73,11 @@ mod ask {
     use crate::misc::{exec_cmd, cut};
 
     pub fn ask_topApp() -> String {
-        use std::path::Path;
-        use std::fs;
+        /*use std::path::Path;
+        use std::fs;*/
 
         let mut topapp = String::new();
-        if Path::new("/sys/kernel/gbe/gbe2_fg_pid").exists() {
+        /*if Path::new("/sys/kernel/gbe/gbe2_fg_pid").exists() {
             let pid = fs::read_to_string("/sys/kernel/gbe/gbe2_fg_pid")
                 .expect("Err : Fail to read pid")
                 .trim()
@@ -85,7 +87,7 @@ mod ask {
                 .trim()
                 .to_string();
             return topapp;
-        }
+        }*/
         let dump_top = exec_cmd("dumpsys", &["activity", "activities"])
             .expect("Err : Failed to dumpsys for Topapp");
         for line in dump_top.lines() {
