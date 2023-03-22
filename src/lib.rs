@@ -17,7 +17,7 @@ mod config {
     pub fn ask(app: &str) -> AppConfig {
         use std::fs;
         
-        let mut isGame = false;
+        let mut is_game = false;
         let mut fps: u64 = 0;
         let mut mode = Mode::Auto;
         let config = fs::read_to_string("/data/FEAShelper.conf").expect("Err : Fail to read config");
@@ -43,27 +43,28 @@ mod config {
                 if line.contains("[B]") {
                     return AppConfig ( false, 0);
                 }
-                isGame = true;
+                is_game = true;
                 let app_conf = cut(line, "=", 1);
-                fps = app_conf.parse()
-                    .expect("Err : Failed to read fps");
-                return AppConfig ( isGame, fps );
+                if let Ok(o) = app_conf.parse() {
+                    fps = o;
+                }
+                return AppConfig ( is_game, fps );
             }
         }
         match mode {
             Mode::Auto => {
-                isGame = ask::ask_isGame();
+                is_game = ask::ask_is_game();
                 fps = ask::ask_target_fps();
             }
             Mode::AutoFps => {
                 fps = ask::ask_target_fps();
             }
             Mode::AutoGame => {
-                isGame = ask::ask_isGame();
+                is_game = ask::ask_is_game();
             }
             Mode::Manual => {}
         }
-        AppConfig ( isGame , fps )
+        AppConfig ( is_game , fps )
     }
 }
 
@@ -72,7 +73,7 @@ mod ask {
 
     use crate::misc::{exec_cmd, cut};
 
-    pub fn ask_topApp() -> String {
+    pub fn ask_top_app() -> String {
         /*use std::path::Path;
         use std::fs;*/
 
@@ -99,7 +100,7 @@ mod ask {
         }
         topapp
     }
-    pub fn ask_isGame() -> bool {
+    pub fn ask_is_game() -> bool {
         let current_surface_view = exec_cmd("dumpsys", &["SurfaceFlinger", "--list"])
             .expect("Err : Failed to execute dumpsys SurfaceView");
         for line in current_surface_view.lines() {
@@ -117,18 +118,18 @@ mod ask {
             .expect("Err : Failed to dump fps");
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-        let frame_A = u64::from_str_radix(&current_fps, 16)
+        let frame_a = u64::from_str_radix(&current_fps, 16)
             .unwrap();
-        let timeA = time::SystemTime::now();
+        let time_a = time::SystemTime::now();
         sleep(Duration::from_millis(100));
         current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-        let frame_B = u64::from_str_radix(&current_fps, 16)
+        let frame_b = u64::from_str_radix(&current_fps, 16)
             .unwrap();
-        let timeB = time::SystemTime::now();
-        let result = (frame_B - frame_A) * 1000 * 1000 * 1000 / (timeB.duration_since(timeA).unwrap().as_nanos()
+        let time_b = time::SystemTime::now();
+        let result = (frame_b - frame_a) * 1000 * 1000 * 1000 / (time_b.duration_since(time_a).unwrap().as_nanos()
             as u64);
         return result;
     }
@@ -148,67 +149,67 @@ mod ask {
 }
 
 mod process_feas {
-    pub struct FeasSysfs {
+    pub struct feas_sysfs {
         path: String,
         newer_feas: bool
     }
     
-    impl FeasSysfs {
-        pub fn init() -> FeasSysfs{
+    impl feas_sysfs {
+        pub fn init() -> feas_sysfs{
             use std::path::Path;
             use std::process::exit;
-            let TestFile = | x: &str | (Path::new(x).exists());
-            let mut path: String;
+            let test_file = | x: &str | (Path::new(x).exists());
+            let path: String;
             let newer_feas: bool;
-            if TestFile("/sys/module/bocchi_perfmgr/parameters/perfmgr_enable") { // 56 fas
+            if test_file("/sys/module/bocchi_perfmgr/parameters/perfmgr_enable") { // 56 fas
                 path = String::from("/sys/module/bocchi_perfmgr/parameters/");
-            } else if TestFile("/sys/module/perfmgr/parameters/perfmgr_enable") { // qcom feas
+            } else if test_file("/sys/module/perfmgr/parameters/perfmgr_enable") { // qcom feas
                 path = String::from("/sys/module/perfmgr/parameters/");
-            } else if TestFile("/sys/module/perfmgr_policy/parameters/perfmgr_enable") { // super old qcom feas
+            } else if test_file("/sys/module/perfmgr_policy/parameters/perfmgr_enable") { // super old qcom feas
                 path = String::from("/sys/module/perfmgr_policy/parameters/");
-            } else if TestFile("/sys/module/mtk_fpsgo/parameters/") {
+            } else if test_file("/sys/module/mtk_fpsgo/parameters/") {
                 path = String::from("/sys/module/mtk_fpsgo/parameters/");
             } else {
                 eprintln!("不支持的设备!");
                 exit(-1);
             }
-            if TestFile(&format!("{}target_fps_61", path)) {
+            if test_file(&format!("{}target_fps_61", path)) {
                 newer_feas = true;
             } else {
                 newer_feas = false;
             }
-            FeasSysfs {
+            feas_sysfs {
                 path,
                 newer_feas
             }
         }
         
         pub fn goes(&self, switch: bool, fps: u64) {
-            use crate::misc::WriteFile;
+            use crate::misc::write_file;
             let sw_path = format!("{}perfmgr_enable", self.path);
             let fps_path = format!("{}fixed_target_fps", self.path);
             if switch {
-                WriteFile("1", &sw_path);
-                WriteFile(&fps.to_string(), &fps_path);
+                write_file("1", &sw_path);
+                write_file(&fps.to_string(), &fps_path);
             } else {
-                WriteFile("0", &sw_path);
+                write_file("0", &sw_path);
             }
             if self.newer_feas {
                 let path_61 = format!("{}target_fps_61", self.path);
                 let path_91 = format!("{}target_fps_91", self.path);
                 let path_121 = format!("{}target_fps_121", self.path);
                 if fps <= 65 {
-                    WriteFile("1", &path_61);
-                    WriteFile("0", &path_91);
-                    WriteFile("0", &path_121);
+                    write_file("1", &path_61);
+                    write_file("0", &path_91);
+                    write_file("0", &path_121);
                 } else if fps <= 95 {
-                    WriteFile("0", &path_61);
-                    WriteFile("1", &path_91);
-                    WriteFile("0", &path_121);
+                    write_file("0", &path_61);
+                    write_file("1", &path_91);
+                    write_file("0", &path_121);
                 } else if fps < 144 {
-                    WriteFile("0", &path_61);
-                    WriteFile("0", &path_91);
-                    WriteFile("1", &path_121)
+                    write_file("0", &path_61);
+                    write_file("0", &path_91);
+                    write_file("1", &path_121)
                 }
             }
         }
@@ -216,11 +217,11 @@ mod process_feas {
 }
 
 pub fn run () {
-    use crate::process_feas::FeasSysfs;
-    let FeasSysfs = FeasSysfs::init();
+    use crate::process_feas::feas_sysfs;
+    let feas_sysfs = feas_sysfs::init();
     loop {
         sleep(Duration::from_secs(1));
-        let AppConfig(switch, fps) = config::ask(&ask::ask_topApp());
-        FeasSysfs.goes(switch, fps);
+        let AppConfig(switch, fps) = config::ask(&ask::ask_top_app());
+        feas_sysfs.goes(switch, fps);
     }
 }

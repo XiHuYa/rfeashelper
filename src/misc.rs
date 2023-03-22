@@ -39,7 +39,7 @@ pub fn cut(str: &str, sym: &str, f: usize) -> String {
     }
 }
 
-pub fn WriteFile(content: &str, path: &str) {
+pub fn write_file(content: &str, path: &str) {
     use std::fs::{OpenOptions, set_permissions};
     use std::io::Write;
     use std::os::unix::fs::{PermissionsExt};
