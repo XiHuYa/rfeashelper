@@ -7,20 +7,21 @@ mod config {
     use crate::{ask, misc::cut};
 
     pub enum Mode {
-        Auto, // 完全自动推断，忽略白名单(likely)
-        AutoFps, // 推断目标fps，准守白名单包名
+        Auto,     // 完全自动推断，忽略白名单(likely)
+        AutoFps,  // 推断目标fps，准守白名单包名
         AutoGame, // 推断是否游戏，准守白名单fps
-        Manual // 无自动推断，完全准守白名单
+        Manual,   // 无自动推断，完全准守白名单
     }
     pub struct AppConfig(pub bool, pub u64);
 
     pub fn ask(app: &str) -> AppConfig {
         use std::fs;
-        
+
         let mut is_game = false;
         let mut fps: u64 = 0;
         let mut mode = Mode::Auto;
-        let config = fs::read_to_string("/data/FEAShelper.conf").expect("Err : Fail to read config");
+        let config =
+            fs::read_to_string("/data/FEAShelper.conf").expect("Err : Fail to read config");
         for line in config.lines() {
             let first = line.chars().next();
             if let Some('#') = first {
@@ -41,14 +42,22 @@ mod config {
             // println!("{}, {}", &line, app.len());
             if line.contains(&app) {
                 if line.contains("[B]") {
-                    return AppConfig ( false, 0);
+                    return AppConfig(false, 0);
                 }
                 is_game = true;
-                let app_conf = cut(line, "=", 1);
-                if let Ok(o) = app_conf.parse() {
-                    fps = o;
+                let app_cut = cut(line, "=", 1);
+                let app_cut: Vec<&str> = app_cut.split_whitespace().collect();
+                let mut app_conf: Vec<u64> = Vec::new();
+                for s in app_cut {
+                    match s.parse() {
+                        Ok(o) => {
+                            app_conf.push(o);
+                        }
+                        Err(e) => {}
+                    }
                 }
-                return AppConfig ( is_game, fps );
+                fps = ask::ask_target_fps_conf(&app_conf);
+                return AppConfig(is_game, fps);
             }
         }
         match mode {
@@ -64,14 +73,17 @@ mod config {
             }
             Mode::Manual => {}
         }
-        AppConfig ( is_game , fps )
+        AppConfig(is_game, fps)
     }
 }
 
 mod ask {
-    use std::{thread::sleep, time::{Duration, self}};
+    use std::{
+        thread::sleep,
+        time::{self, Duration},
+    };
 
-    use crate::misc::{exec_cmd, cut};
+    use crate::misc::{cut, exec_cmd};
 
     pub fn ask_top_app() -> String {
         /*use std::path::Path;
@@ -112,31 +124,29 @@ mod ask {
         }
         return false;
     }
-    
+
     fn get_current_fps() -> u64 {
         let mut current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-        let frame_a = u64::from_str_radix(&current_fps, 16)
-            .unwrap();
+        let frame_a = u64::from_str_radix(&current_fps, 16).unwrap();
         let time_a = time::SystemTime::now();
         sleep(Duration::from_millis(100));
         current_fps = exec_cmd("service", &["call", "SurfaceFlinger", "1013"])
             .expect("Err : Failed to dump fps");
         current_fps = cut(&current_fps, "(", 1);
         current_fps = cut(&current_fps, "\'", 0);
-        let frame_b = u64::from_str_radix(&current_fps, 16)
-            .unwrap();
+        let frame_b = u64::from_str_radix(&current_fps, 16).unwrap();
         let time_b = time::SystemTime::now();
-        let result = (frame_b - frame_a) * 1000 * 1000 * 1000 / (time_b.duration_since(time_a).unwrap().as_nanos()
-            as u64);
+        let result = (frame_b - frame_a) * 1000 * 1000 * 1000
+            / (time_b.duration_since(time_a).unwrap().as_nanos() as u64);
         return result;
     }
-    
+
     pub fn ask_target_fps() -> u64 {
         let fps = get_current_fps();
-        const FPS: [u64;6] = [30, 45, 60, 90, 120, 144];
+        const FPS: [u64; 6] = [30, 45, 60, 90, 120, 144];
         let mut i = 1;
         while i < (FPS.len() - 1) {
             if fps > (FPS[i] + 5) && fps < FPS[i + 1] {
@@ -146,44 +156,62 @@ mod ask {
         }
         *FPS.last().unwrap()
     }
+    pub fn ask_target_fps_conf(FPS: &Vec<u64>) -> u64 {
+        let fps = get_current_fps();
+        if FPS.is_empty() {
+            return 0;
+        }
+        let mut i = 0;
+        while i < FPS.len() - 1 {
+            if i != 0 {
+                if FPS[i - 1] + 5 < fps && FPS[i] + 5 > fps {
+                    return FPS[i];
+                }
+            }
+            i += 1;
+        }
+        FPS[0]
+    }
 }
 
 mod process_feas {
     pub struct feas_sysfs {
         path: String,
-        newer_feas: bool
+        newer_feas: bool,
     }
-    
+
     impl feas_sysfs {
-        pub fn init() -> feas_sysfs{
+        pub fn init() -> feas_sysfs {
             use std::path::Path;
             use std::process::exit;
-            let test_file = | x: &str | (Path::new(x).exists());
+            let test_file = |x: &str| (Path::new(x).exists());
             let path: String;
             let newer_feas: bool;
-            if test_file("/sys/module/bocchi_perfmgr/parameters/perfmgr_enable") { // 56 fas
+            if test_file("/sys/module/bocchi_perfmgr/parameters/perfmgr_enable") {
+                // 56 fas
                 path = String::from("/sys/module/bocchi_perfmgr/parameters/");
-            } else if test_file("/sys/module/perfmgr/parameters/perfmgr_enable") { // qcom feas
+            } else if test_file("/sys/module/perfmgr/parameters/perfmgr_enable") {
+                // qcom feas
                 path = String::from("/sys/module/perfmgr/parameters/");
-            } else if test_file("/sys/module/perfmgr_policy/parameters/perfmgr_enable") { // super old qcom feas
+            } else if test_file("/sys/module/perfmgr_policy/parameters/perfmgr_enable") {
+                // super old qcom feas
                 path = String::from("/sys/module/perfmgr_policy/parameters/");
             } else if test_file("/sys/module/mtk_fpsgo/parameters/") {
+                // mtk feas
                 path = String::from("/sys/module/mtk_fpsgo/parameters/");
             } else {
                 eprintln!("不支持的设备!");
                 exit(-1);
             }
             if test_file(&format!("{}target_fps_61", path)) {
+                // new feas
                 newer_feas = true;
             } else {
                 newer_feas = false;
             }
-            feas_sysfs {
-                path,
-                newer_feas
-            }
+            feas_sysfs { path, newer_feas }
         }
-        
+
         pub fn goes(&self, switch: bool, fps: u64) {
             use crate::misc::write_file;
             let sw_path = format!("{}perfmgr_enable", self.path);
@@ -216,7 +244,7 @@ mod process_feas {
     }
 }
 
-pub fn run () {
+pub fn run() {
     use crate::process_feas::feas_sysfs;
     let feas_sysfs = feas_sysfs::init();
     loop {
